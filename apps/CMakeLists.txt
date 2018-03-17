@@ -1,0 +1,4 @@
+
+add_subdirectory(create_board_charuco)
+add_subdirectory(create_marker_diamond)
+add_subdirectory(create_marker)
