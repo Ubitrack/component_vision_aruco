@@ -1,6 +1,34 @@
-//
-// Created by Ulrich Eck on 17.03.18.
-//
+/*
+* Ubitrack - Library for Ubiquitous Tracking
+* Copyright 2006, Technische Universitaet Muenchen, and individual
+        * contributors as indicated by the @authors tag. See the
+* copyright.txt in the distribution for a full listing of individual
+        * contributors.
+*
+* This is free software; you can redistribute it and/or modify it
+* under the terms of the GNU Lesser General Public License as
+        * published by the Free Software Foundation; either version 2.1 of
+        * the License, or (at your option) any later version.
+*
+* This software is distributed in the hope that it will be useful,
+        * but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+        * Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public
+* License along with this software; if not, write to the Free
+* Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+* 02110-1301 USA, or see the FSF site: http://www.fsf.org.
+*/
+
+
+/**
+ * @ingroup vision_components_aruci
+ * @file
+ * Camera Calibration with Charuco Board
+ *
+ * @author Ulrich Eck <ulrich.eck@tum.de>
+ */
 
 #include "CharucoCameraCalibration.h"
 
@@ -105,12 +133,14 @@ CharucoCameraCalibration::CharucoCameraCalibration( const std::string& sName, bo
     // reset button config
     std::string buttonReset( " " );
     if ( pCfg->m_DataflowAttributes.hasAttribute( "buttonReset" ) ) {
-        buttonReset = pCfg->m_DataflowAttributes.getAttributeString( "buttonRest" );
+        buttonReset = pCfg->m_DataflowAttributes.getAttributeString( "buttonReset" );
     }
 
     if ( buttonReset.empty() ) {
         m_buttonReset = Math::Scalar< int >( -1 );
+        LOG4CPP_WARN( logger, "No Button value defined - will react to ANY signal." );
     } else {
+        LOG4CPP_INFO( logger, "Calibration Reset value: " << buttonReset[ 0 ] );
         m_buttonReset = Math::Scalar< int >( buttonReset[ 0 ] );
     }
 
@@ -122,6 +152,7 @@ CharucoCameraCalibration::CharucoCameraCalibration( const std::string& sName, bo
 }
 
 void CharucoCameraCalibration::reset() {
+    LOG4CPP_INFO( logger, "Reset Camera Calibration Data." );
     m_allCorners.clear();
     m_allIds.clear();
 }
@@ -131,6 +162,19 @@ void CharucoCameraCalibration::controlInput( const Measurement::Button& b )
     if ( m_buttonReset < 0 || *b == m_buttonReset ) {
         // do we need to take care of a currently running thread?
         reset();
+    }
+}
+
+void CharucoCameraCalibration::start() {
+    reset();
+}
+
+void CharucoCameraCalibration::stop() {
+    if (m_pThread) {
+        if (m_pThread->joinable()) {
+            m_pThread->join();
+            m_pThread.reset();
+        }
     }
 }
 
@@ -230,7 +274,7 @@ void CharucoCameraCalibration::computeIntrinsic( const vector_2d_points allCorne
 /** Method to detect the marker and corner points. */
 void CharucoCameraCalibration::pushImage( const Measurement::ImageMeasurement& img )
 {
-    LOG4CPP_INFO( logger, "Acruco Board Calibration Received ImageMeasurement." );
+    LOG4CPP_DEBUG( logger, "Acruco Board Calibration Received ImageMeasurement." );
     cv::Ptr<cv::aruco::Board> board = m_charucoboard.staticCast<cv::aruco::Board>();
     cv::Mat image = img->Mat();
 
@@ -246,13 +290,18 @@ void CharucoCameraCalibration::pushImage( const Measurement::ImageMeasurement& i
 
     // interpolate charuco corners
     cv::Mat currentCharucoCorners, currentCharucoIds;
-    if(ids.size() > 0)
+    if(ids.size() > 0) {
         cv::aruco::interpolateCornersCharuco(corners, ids, image, m_charucoboard, currentCharucoCorners, currentCharucoIds);
+    } else {
+        LOG4CPP_INFO( logger, "No markers were detected." );
+        return;
+    }
 
     // draw results
     if (m_debugPort.isConnected()) {
         boost::shared_ptr< Image > pDebugImg = img->CvtColor(CV_GRAY2RGB, 3);
         cv::Mat imageCopy = pDebugImg->Mat();
+
         if(ids.size() > 0) {
             cv::aruco::drawDetectedMarkers(imageCopy, corners);
         }
@@ -265,6 +314,8 @@ void CharucoCameraCalibration::pushImage( const Measurement::ImageMeasurement& i
     m_allCorners.push_back(corners);
     m_allIds.push_back(ids);
     m_imgSize = image.size();
+
+    LOG4CPP_INFO( logger, "Size of Calibrations: " << m_allIds.size() );
 
     if (m_allIds.size() > 2) {
         if( !boost::mutex::scoped_try_lock ( m_mutexThread ) )

@@ -33,11 +33,13 @@
 #include <utDataflow/ComponentFactory.h>
 
 #include "CharucoCameraCalibration.h"
+#include "CharucoMarkerTracker.h"
 
 namespace Ubitrack { namespace Components {
 
 UBITRACK_REGISTER_COMPONENT( Dataflow::ComponentFactory* const cf ) {
     cf->registerComponent< Vision::CharucoCameraCalibration> ( "CharucoCameraCalibration" );
+    cf->registerComponent< Vision::CharucoMarkerTracker> ( "CharucoMarkerTracker" );
 }
 } } // namespace Ubitrack::Components
 

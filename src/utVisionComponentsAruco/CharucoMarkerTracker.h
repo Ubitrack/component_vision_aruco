@@ -30,9 +30,6 @@
  * @author Ulrich Eck <ulrich.eck@tum.de>
  */
 
-#ifndef UBITRACK_COMPONENT_VISION_ARUCO_CHARUCOCAMERACALIBRATION_H
-#define UBITRACK_COMPONENT_VISION_ARUCO_CHARUCOCAMERACALIBRATION_H
-
 #include <vector>
 #include <boost/bind.hpp>
 #include <boost/thread.hpp>
@@ -50,25 +47,15 @@ namespace Ubitrack { namespace Vision {
 
 
 
-class CharucoCameraCalibration
+class CharucoMarkerTracker
         : public ArucoTrackerBase
 {
 protected:
-    typedef std::vector< std::vector< std::vector< cv::Point2f > > > vector_2d_points;
-    typedef std::vector< std::vector< int > > vector_marker_ids;
 
 public:
-    CharucoCameraCalibration( const std::string& sName, boost::shared_ptr< Graph::UTQLSubgraph > pCfg );
+    CharucoMarkerTracker( const std::string& sName, boost::shared_ptr< Graph::UTQLSubgraph > pCfg );
 
-    void reset();
-    void controlInput( const Measurement::Button& b );
     void pushImage( const Measurement::ImageMeasurement& img );
-
-    virtual void start();
-    virtual void stop();
-
-    /** Method that computes the result. */
-    void computeIntrinsic( const vector_2d_points allCorners, const vector_marker_ids allIds );
 
 protected:
 
@@ -78,43 +65,35 @@ protected:
     float  m_squareLength;
     float  m_markerLength;
     int    m_dictionaryId;
-    int    m_calibrationFlags;
     bool   m_refindStrategy;
-    float  m_aspectRatio;
+
+    bool   m_useUndistoredImage;
 
     // charuco board data
     cv::Ptr<cv::aruco::Dictionary> m_dictionary;
     cv::Ptr<cv::aruco::CharucoBoard> m_charucoboard;
 
-    // working data
-    vector_2d_points m_allCorners;
-    vector_marker_ids m_allIds;
-    cv::Size m_imgSize;
-
-    // reset button
-    Math::Scalar<int> m_buttonReset;
-
-    /** signs if the thread is running. */
-    boost::mutex m_mutexThread;
-
-    /** thread performing camera calibration in the background. */
-    boost::scoped_ptr< boost::thread > m_pThread;
-
-
     /** Input Image. */
     Dataflow::PushConsumer< Measurement::ImageMeasurement > m_inPort;
 
-    /** Signal Port. */
-    Dataflow::PushConsumer< Measurement::Button > m_SignalPort;
-
     /** Camera Intrinsics */
-    Dataflow::PushSupplier< Measurement::CameraIntrinsics > m_intrPort;
+    Dataflow::PullConsumer< Measurement::CameraIntrinsics > m_inIntrinsics;
 
     /** Image for debugging purposes */
     Dataflow::PushSupplier< Measurement::ImageMeasurement > m_debugPort;
+
+    /** Tracked Pose */
+    Dataflow::PushSupplier< Measurement::Pose > m_outPort;
 
 };
 
 }} // Ubitrack::Vision
 
-#endif //UBITRACK_COMPONENT_VISION_ARUCO_CHARUCOCAMERACALIBRATION_H
+#ifndef UBITRACK_COMPONENT_VISION_ARUCO_CHARUCOMARKERTRACKER_H
+#define UBITRACK_COMPONENT_VISION_ARUCO_CHARUCOMARKERTRACKER_H
+
+class CharucoMarkerTracker {
+
+};
+
+#endif //UBITRACK_COMPONENT_VISION_ARUCO_CHARUCOMARKERTRACKER_H
