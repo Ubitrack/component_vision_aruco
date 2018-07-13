@@ -6,7 +6,7 @@ class UbitrackCoreConan(ConanFile):
     version = "1.3.0"
 
     description = "Ubitrack Vision Components using OpenCV Aruco Tracking"
-    url = "https://github.com/Ubitrack/component_vision.git"
+    url = "https://github.com/Ubitrack/component_vision_aruco.git"
     license = "GPL"
 
     short_paths = True
