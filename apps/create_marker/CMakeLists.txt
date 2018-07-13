@@ -10,8 +10,6 @@ file(GLOB UBITRACK_HEADERS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
         "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
         )
 
-#include_directories(${CMAKE_SOURCE_DIR}/src)
-
 if(MSVC)
     set(UBITRACK_COMPILE_DEFINITIONS ${UBITRACK_COMPILE_DEFINITIONS} "BOOST_ALL_DYN_LINK")
 endif(MSVC)
@@ -19,40 +17,24 @@ endif(MSVC)
 # UTCORE library definition
 add_executable(${UBITRACK_APPLICATION_NAME} ${UBITRACK_SRCS} ${UBITRACK_HEADERS})
 
-target_link_libraries(${UBITRACK_APPLICATION_NAME} ${CONAN_LIBS})
+target_link_libraries(${UBITRACK_APPLICATION_NAME} 
+  CONAN_PKG::opencv
+  )
+
+target_include_directories(${UBITRACK_APPLICATION_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+  $<INSTALL_INTERFACE:include>
+  PRIVATE 
+  $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src>
+)
 
 # Apply Target Properties
 if(MSVC)
-    if(CMAKE_CROSSCOMPILING)
-        set_target_properties(${UBITRACK_APPLICATION_NAME} PROPERTIES LINK_FLAGS "/NODEFAULTLIB:secchk")
-    endif()
-    set_target_properties(${UBITRACK_APPLICATION_NAME} PROPERTIES LINK_FLAGS "/NODEFAULTLIB:libc /DEBUG")
+  if(CMAKE_CROSSCOMPILING)
+    set_target_properties(${UBITRACK_APPLICATION_NAME} PROPERTIES LINK_FLAGS "/NODEFAULTLIB:secchk")
+  endif()
+  set_target_properties(${UBITRACK_APPLICATION_NAME} PROPERTIES LINK_FLAGS "/NODEFAULTLIB:libc /DEBUG")
 endif()
 
-foreach(_flag ${UBITRACK_COMPILE_FLAGS})
-    set_target_properties(${UBITRACK_APPLICATION_NAME} PROPERTIES COMPILE_FLAGS "${_flag}")
-endforeach()
-foreach(_flag ${UBITRACK_LINK_FLAGS})
-    set_target_properties(${UBITRACK_APPLICATION_NAME} PROPERTIES LINK_FLAGS "${_flag}")
-endforeach()
-foreach(_flag ${UBITRACK_LINK_FLAGS_DEBUG})
-    set_target_properties(${UBITRACK_APPLICATION_NAME} PROPERTIES LINK_FLAGS_DEBUG "${_flag}")
-endforeach()
-foreach(_symb ${UBITRACK_DEFINES})
-    set_target_properties(${UBITRACK_APPLICATION_NAME} PROPERTIES DEFINE_SYMBOL ${_symb})
-endforeach()
-
-# set compiler Definitions
-set_target_properties(${UBITRACK_APPLICATION_NAME} PROPERTIES COMPILE_DEFINITIONS "${UBITRACK_COMPILE_DEFINITIONS}")
-
-set_target_properties(${UBITRACK_APPLICATION_NAME} PROPERTIES
-        DEBUG_POSTFIX "${UBITRACK_DEBUG_POSTFIX}"
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_INSTALL_BINDIR}
-        )
-
-# Installation of libraries, headers and documents
-install(TARGETS ${UBITRACK_APPLICATION_NAME}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        )
+ubitrack_set_target_properties(${UBITRACK_APPLICATION_NAME})
+ubitrack_install_application(${UBITRACK_APPLICATION_NAME})
