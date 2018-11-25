@@ -46,3 +46,6 @@ class UbitrackCoreConan(ConanFile):
 
     def package_info(self):
         pass
+
+    def package_id(self):
+        self.requires["ubitrack_vision"].full_package_mode()
