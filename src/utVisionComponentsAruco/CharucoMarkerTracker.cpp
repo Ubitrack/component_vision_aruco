@@ -123,6 +123,10 @@ void CharucoMarkerTracker::pushImage( const Measurement::ImageMeasurement& img )
     cv::Ptr<cv::aruco::Board> board = m_charucoboard.staticCast<cv::aruco::Board>();
     cv::Mat image = img->Mat();
 
+    if (img->origin() == 1) {
+        LOG4CPP_WARN(logger, "Image with orign lower-left corner are currently not handled correclty.");
+    }
+
     Math::CameraIntrinsics<double> camera_intrinsics = *m_inIntrinsics.get(img.time());
 
     cv::Mat camMatrix = cv::Mat::eye(3, 3, CV_64F);
