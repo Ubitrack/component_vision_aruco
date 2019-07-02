@@ -91,6 +91,9 @@ protected:
     vector_marker_ids m_allIds;
     cv::Size m_imgSize;
 
+    // origin flag of image to correctly convert calibration to ubitrack format
+    int m_origin;
+
     // reset button
     Math::Scalar<int> m_buttonReset;
 

@@ -33,6 +33,7 @@
 
 #include "CharucoMarkerTracker.h"
 
+#include <utVision/Util/OpenCV.h>
 
 
 #include <log4cpp/Category.hh>
@@ -104,8 +105,8 @@ CharucoMarkerTracker::CharucoMarkerTracker( const std::string& sName, boost::sha
     }
 
     // Refind Stragegy enabled
-    if ( pCfg->m_DataflowAttributes.hasAttribute( "useUndistoredImage" ) ) {
-        m_useUndistoredImage = pCfg->m_DataflowAttributes.getAttributeString("useUndistoredImage" ) == "true";
+    if ( pCfg->m_DataflowAttributes.hasAttribute( "useUndistortedImage" ) ) {
+        m_useUndistoredImage = pCfg->m_DataflowAttributes.getAttributeString("useUndistortedImage" ) == "true";
     }
 
 
@@ -121,48 +122,31 @@ void CharucoMarkerTracker::pushImage( const Measurement::ImageMeasurement& img )
 {
     LOG4CPP_DEBUG( logger, "Acruco Board Calibration Received ImageMeasurement." );
     cv::Ptr<cv::aruco::Board> board = m_charucoboard.staticCast<cv::aruco::Board>();
-    cv::Mat image = img->Mat();
+    cv::Mat image;
 
     if (img->origin() == 1) {
-        LOG4CPP_WARN(logger, "Image with orign lower-left corner are currently not handled correclty.");
+        LOG4CPP_WARN(logger, "Image with orign lower-left corner are currently not handled correclty. Image is being flipped!!!");
+        cv::flip(img->Mat(),image,0);
+    } else {
+        image = img->Mat();
     }
 
     Math::CameraIntrinsics<double> camera_intrinsics = *m_inIntrinsics.get(img.time());
 
-    cv::Mat camMatrix = cv::Mat::eye(3, 3, CV_64F);
-    camMatrix.at<double>(0, 0) = camera_intrinsics.matrix(0, 0);
-    camMatrix.at<double>(0, 1) = camera_intrinsics.matrix(0, 1);
-    camMatrix.at<double>(0, 2) = -camera_intrinsics.matrix(0, 2);
-    camMatrix.at<double>(1, 0) = camera_intrinsics.matrix(1, 0);
-    camMatrix.at<double>(1, 1) = camera_intrinsics.matrix(1, 1);
-    camMatrix.at<double>(1, 2) = -camera_intrinsics.matrix(1, 2);
-    camMatrix.at<double>(2, 0) = camera_intrinsics.matrix(2, 0);
-    camMatrix.at<double>(2, 1) = camera_intrinsics.matrix(2, 1);
-    camMatrix.at<double>(2, 2) = -camera_intrinsics.matrix(2, 2);
 
+   camera_intrinsics = Vision::Util::cv2::correctForOrigin(0, camera_intrinsics);
+
+
+    cv::Mat camMatrix;
     cv::Mat distCoeffs;
-    if(!m_useUndistoredImage) {
-        if (camera_intrinsics.radial_size == 6) {
-            distCoeffs = cv::Vec<double, 8>();
-            distCoeffs.at<double>(0) = camera_intrinsics.radial_params(0);
-            distCoeffs.at<double>(1) = camera_intrinsics.radial_params(1);
+   
+    Vision::Util::cv2::assignAndConvertToOpenCV( camera_intrinsics, distCoeffs, camMatrix );
 
-            distCoeffs.at<double>(2) = camera_intrinsics.tangential_params(0);
-            distCoeffs.at<double>(3) = camera_intrinsics.tangential_params(1);
-
-            distCoeffs.at<double>(4) = camera_intrinsics.radial_params(2);
-            distCoeffs.at<double>(5) = camera_intrinsics.radial_params(3);
-            distCoeffs.at<double>(6) = camera_intrinsics.radial_params(4);
-            distCoeffs.at<double>(7) = camera_intrinsics.radial_params(5);
-        } else if (camera_intrinsics.radial_size == 2) {
-            distCoeffs = cv::Vec<double, 4>();
-            distCoeffs.at<double>(0) = camera_intrinsics.radial_params(0);
-            distCoeffs.at<double>(1) = camera_intrinsics.radial_params(1);
-
-            distCoeffs.at<double>(2) = camera_intrinsics.tangential_params(0);
-            distCoeffs.at<double>(3) = camera_intrinsics.tangential_params(1);
-        }
+    if(m_useUndistoredImage) {
+        distCoeffs = cv::Mat::zeros(4, 1, CV_64F);;
     }
+
+
 
     std::vector< int > markerIds, charucoIds;
     std::vector< std::vector< cv::Point2f > > markerCorners, rejectedMarkers;
@@ -209,25 +193,36 @@ void CharucoMarkerTracker::pushImage( const Measurement::ImageMeasurement& img )
 
     if (validPose) {
         // convert tracked pose to Ubitrack::Measurement::Pose
-        cv::Mat rot(3, 3, CV_64FC1);
-        cv::Rodrigues(rvec, rot);
+        cv::Mat rotMatOpenCV(3, 3, CV_64FC1);
+        cv::Rodrigues(rvec, rotMatOpenCV);
 
-        // convert to right-handed coordinate system (from chessboard tracking .. might not be correct ..)
+        // convert to right-handed coordinate system
+        
         Math::Matrix<double, 3, 3> rotMat;
-        rotMat(0, 0) = rot.at<double>(0, 0);
-        rotMat(0, 1) = rot.at<double>(0, 1);
-        rotMat(0, 2) = -rot.at<double>(0, 2);
-        rotMat(1, 0) = rot.at<double>(1, 0);
-        rotMat(1, 1) = rot.at<double>(1, 1);
-        rotMat(1, 2) = -rot.at<double>(1, 2);
-        rotMat(2, 0) = -rot.at<double>(2, 0);
-        rotMat(2, 1) = -rot.at<double>(2, 1);
-        rotMat(2, 2) = rot.at<double>(2, 2);
+        rotMat(0, 0) = rotMatOpenCV.at<double>(0, 0);
+        rotMat(0, 1) = rotMatOpenCV.at<double>(0, 1);
+        rotMat(0, 2) = rotMatOpenCV.at<double>(0, 2);
+        rotMat(1, 0) = rotMatOpenCV.at<double>(1, 0);
+        rotMat(1, 1) = rotMatOpenCV.at<double>(1, 1);
+        rotMat(1, 2) = rotMatOpenCV.at<double>(1, 2);
+        rotMat(2, 0) = rotMatOpenCV.at<double>(2, 0);
+        rotMat(2, 1) = rotMatOpenCV.at<double>(2, 1);
+        rotMat(2, 2) = rotMatOpenCV.at<double>(2, 2);
+        
 
-        double flip_y = img->origin() ? 1. : -1.;
-        Math::Pose pose(Math::Quaternion(rotMat), Math::Vector<double, 3>(tvec(0), flip_y*tvec(1), -tvec(2)));
+        Math::Quaternion rotTmp = Math::Quaternion(rotMat);
+        Math::Quaternion rot = Math::Quaternion(rotTmp.x(), -rotTmp.y(), -rotTmp.z(), rotTmp.w());
 
-        m_outPort.send(Measurement::Pose(img.time(), pose));
+   
+        Math::Pose pose(rot, Math::Vector<double, 3>(tvec(0), -tvec(1), -tvec(2)));
+
+        // rotate target pose to align with other ubitrack tracker, X to the right, Y up on the marker, Z out of the plane
+        Math::Quaternion q1 = Math::Quaternion(1, 0, 0, 0);
+        Math::Pose rotpose = Math::Pose(q1, Math::Vector3d(0, 0, 0));
+        Math::Pose result = pose*rotpose;
+
+
+        m_outPort.send(Measurement::Pose(img.time(), result));
     }
 }
 

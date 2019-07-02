@@ -34,6 +34,7 @@
 
 
 #include <log4cpp/Category.hh>
+#include <utVision/Util/OpenCV.h>
 static log4cpp::Category& logger( log4cpp::Category::getInstance( "Ubitrack.Vision.CharucoCameraCalibration" ) );
 namespace Ubitrack { namespace Vision {
 
@@ -51,6 +52,7 @@ CharucoCameraCalibration::CharucoCameraCalibration( const std::string& sName, bo
         , m_intrPort( "Output", *this )
         , m_debugPort( "DebugImage", *this )
         , m_mutexThread( )
+        , m_origin(1)
 {
     // Parse Charuco Board
     pCfg->m_DataflowAttributes.getAttributeData( "squaresX", m_squaresX);
@@ -265,6 +267,9 @@ void CharucoCameraCalibration::computeIntrinsic( const vector_2d_points allCorne
 
         m_camIntrinsics = Math::CameraIntrinsics< double >(intrinsic, radial, tangential, (std::size_t)m_imgSize.width, (std::size_t)m_imgSize.height);
     }
+    
+    // check origin of images used, since everything is done internally by aruco we need to flip the result of the image origin is 0, ubitrack default is 1
+    m_camIntrinsics = Vision::Util::cv2::correctForOrigin(m_origin, m_camIntrinsics);
 
     m_intrPort.send( Measurement::CameraIntrinsics ( Measurement::now(), m_camIntrinsics ) );
     LOG4CPP_INFO( logger, "Finished camera calibration using " << m_values << " views." );
@@ -277,6 +282,7 @@ void CharucoCameraCalibration::pushImage( const Measurement::ImageMeasurement& i
     LOG4CPP_DEBUG( logger, "Acruco Board Calibration Received ImageMeasurement." );
     cv::Ptr<cv::aruco::Board> board = m_charucoboard.staticCast<cv::aruco::Board>();
     cv::Mat image = img->Mat();
+    m_origin = img->origin();
 
     std::vector< int > ids;
     std::vector< std::vector< cv::Point2f > > corners, rejected;
