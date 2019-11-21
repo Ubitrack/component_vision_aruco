@@ -14,14 +14,19 @@ FILE(GLOB UBITRACK_HEADERS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
 # library definition
 ADD_LIBRARY(${UBITRACK_LIBRARY_NAME} SHARED ${UBITRACK_SRCS} ${UBITRACK_HEADERS})
 
-target_link_libraries(${UBITRACK_LIBRARY_NAME} 
+target_link_libraries(${UBITRACK_LIBRARY_NAME} PUBLIC
 		CONAN_PKG::ubitrack_core
 		CONAN_PKG::ubitrack_vision
 		CONAN_PKG::ubitrack_dataflow
 		OpenGL::GL
 		OpenGL::GLU
-		OpenCL::OpenCL
 		)
+
+if(WITH_OPENCL)
+	target_link_libraries(${UBITRACK_LIBRARY_NAME} PUBLIC
+			OpenCL::OpenCL
+	)
+endif()
 
 # do not create symlinks to versioned names of component libraries
 set_target_properties(${UBITRACK_LIBRARY_NAME} PROPERTIES NO_SONAME ON)
